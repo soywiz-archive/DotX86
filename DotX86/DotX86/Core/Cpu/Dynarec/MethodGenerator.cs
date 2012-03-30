@@ -206,7 +206,10 @@ namespace DotX86.Core.Cpu.Dynarec
 									CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
 									break;
 								default:
-									throw (new NotImplementedException());
+									LoadRegisterAddress(Instruction.Register1);
+									LoadRegisterValue(Instruction.Register2);
+									CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
+									break;
 							}
 						}
 						break;

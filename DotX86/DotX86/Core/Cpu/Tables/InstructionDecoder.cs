@@ -114,8 +114,21 @@ namespace DotX86.Core.Cpu.Tables
 			var Byte = Reader.ReadByte();
 			switch (Byte)
 			{
+				// ADD Ew, Gw
+				case 0x01:
+					{
+						var Param = Reader.ReadByte();
+						var Left = ((Param >> 0) & 7);
+						var Right = ((Param >> 3) & 7);
+						return Instruction(Opcode.ADD, (Register)Left, (Register)Right);
+					}
+
+				// Prefix 0x0F
 				case 0x0F:
-					return DecodeInstruction_0F(PC, Reader);
+					{
+						return DecodeInstruction_0F(PC, Reader);
+					}
+
 				// PUSH AX/CX/DX/BX/SP/BP/SI/DI
 				case 0x50:
 				case 0x51:

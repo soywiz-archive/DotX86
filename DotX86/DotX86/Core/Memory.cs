@@ -8,10 +8,26 @@ using System.Threading.Tasks;
 
 namespace DotX86.Core
 {
+#if UNSAFE
+	unsafe
+#endif
 	public class Memory
 	{
-		//public byte[] MemoryPointer = new byte[0x80000];
-		public Dictionary<uint, byte> MemoryPointer = new Dictionary<uint, byte>();
+#if UNSAFE
+		public byte* MemoryPointer;
+#else
+		public byte[] MemoryPointer;
+#endif
+		//public Dictionary<uint, byte> MemoryPointer = new Dictionary<uint, byte>();
+
+		public Memory()
+		{
+#if UNSAFE
+			MemoryPointer = (byte *)Marshal.AllocHGlobal(0x800000).ToPointer();
+#else
+			MemoryPointer = new byte[0x800000];
+#endif
+		}
 
 		public uint Alloc(int Size)
 		{
@@ -32,15 +48,22 @@ namespace DotX86.Core
 
 		public void Write4(uint Address, uint Value)
 		{
+#if UNSAFE
+			*((uint*)(MemoryPointer + Address)) = Value;
+#else
 			MemoryPointer[Address + 0] = (byte)((Value >> 0) & 0xFF);
 			MemoryPointer[Address + 1] = (byte)((Value >> 8) & 0xFF);
 			MemoryPointer[Address + 2] = (byte)((Value >> 16) & 0xFF);
 			MemoryPointer[Address + 3] = (byte)((Value >> 24) & 0xFF);
 			//Console.WriteLine("WRITE4[0x{0:X}] = 0x{1:X}", Address, Value);
+#endif
 		}
 
 		public uint Read4(uint Address)
 		{
+#if UNSAFE
+			return *((uint*)(MemoryPointer + Address));
+#else
 			try
 			{
 				var Value =
@@ -59,6 +82,7 @@ namespace DotX86.Core
 				//throw (new InvalidDataException(String.Format("Invalid address 0x{0:X}", Address)));
 				return 0;
 			}
+#endif
 		}
 
 		public void Write(uint Address, byte[] Data)

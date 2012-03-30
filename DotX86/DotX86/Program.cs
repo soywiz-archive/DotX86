@@ -42,7 +42,7 @@ namespace DotX86
 
 			while (true)
 			{
-				var Method = CpuContext.GenerateMethod(ThreadContext.PC);
+				var Method = CpuContext.GetMethod(ThreadContext.PC);
 				Method(ThreadContext);
 			}
 			//Console.WriteLine("Ended!");

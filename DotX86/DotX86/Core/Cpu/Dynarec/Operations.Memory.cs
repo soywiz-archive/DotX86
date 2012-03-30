@@ -69,6 +69,8 @@ namespace DotX86.Core.Cpu.Dynarec
 			ThreadContext.Flags.ZF = (Result == 0);
 			ThreadContext.Flags.SF = (Result < 0);
 
+			//if (Right < Left) ThreadContext.Flags.OF = true;
+
 			try
 			{
 				Result = checked(Left - Right);
