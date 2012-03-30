@@ -21,5 +21,10 @@ namespace DotX86.Core.Cpu.Tables
 		AND,
 		XOR,
 		CMP,
+		JMP,
+		INT,
+		LEA,
+		LEAVE,
+		JGE,
 	}
 }

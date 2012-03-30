@@ -22,7 +22,7 @@ namespace DotX86.Core.Cpu.Tables
 		{
 			return new Instruction()
 			{
-				Type = InstructionType.Register1,
+				Type = InstructionType.Register,
 				Opcode = Opcode,
 				Register1 = Register,
 			};
@@ -32,7 +32,7 @@ namespace DotX86.Core.Cpu.Tables
 		{
 			return new Instruction()
 			{
-				Type = InstructionType.Register2,
+				Type = InstructionType.RegisterRegister,
 				Opcode = Opcode,
 				Register1 = Register1,
 				Register2 = Register2,
@@ -44,7 +44,7 @@ namespace DotX86.Core.Cpu.Tables
 		{
 			return new Instruction()
 			{
-				Type = InstructionType.Register1Value1,
+				Type = InstructionType.RegisterValue,
 				Opcode = Opcode,
 				Register1 = Register1,
 				Value = Value,
@@ -55,7 +55,7 @@ namespace DotX86.Core.Cpu.Tables
 		{
 			return new Instruction()
 			{
-				Type = InstructionType.Value1,
+				Type = InstructionType.Value,
 				Opcode = Opcode,
 				Value = Value,
 			};
@@ -65,7 +65,7 @@ namespace DotX86.Core.Cpu.Tables
 		{
 			return new Instruction()
 			{
-				Type = InstructionType.Register2Offset,
+				Type = InstructionType.RegisterRegisterOffset,
 				Opcode = Opcode,
 				Register1 = Register1,
 				Register2 = Register2,
@@ -73,11 +73,49 @@ namespace DotX86.Core.Cpu.Tables
 			};
 		}
 
-		static public Instruction DecodeInstruction(BinaryReader Reader)
+		static protected Instruction Instruction(Opcode Opcode, Register Register1, int Value, Register Register2)
+		{
+			return new Instruction()
+			{
+				Type = InstructionType.RegisterOffsetRegister,
+				Opcode = Opcode,
+				Register1 = Register1,
+				Register2 = Register2,
+				Value = (uint)Value,
+			};
+		}
+
+		static public Instruction DecodeInstruction_0F(uint PC, BinaryReader Reader)
 		{
 			var Byte = Reader.ReadByte();
 			switch (Byte)
 			{
+				// JNL / JGE
+				// http://en.wikibooks.org/wiki/X86_Assembly/Control_Flow
+				case 0x8D:
+					{
+						var Value = Reader.ReadInt32();
+						return Instruction(Opcode.JGE, (uint)Value);
+					}
+					throw (new NotImplementedException());
+					break;
+				default: throw (new NotImplementedException(String.Format("Unknown instruction with opcode 0x0F + 0x{0:X} at 0x{1:X}", Byte, PC)));
+			}
+		}
+
+		static public Instruction DecodeInstruction(BinaryReader Reader)
+		{
+			var PC = (uint)Reader.BaseStream.Position;
+			return DecodeInstruction(PC, Reader);
+		}
+
+		static public Instruction DecodeInstruction(uint PC, BinaryReader Reader)
+		{
+			var Byte = Reader.ReadByte();
+			switch (Byte)
+			{
+				case 0x0F:
+					return DecodeInstruction_0F(PC, Reader);
 				// PUSH AX/CX/DX/BX/SP/BP/SI/DI
 				case 0x50:
 				case 0x51:
@@ -146,8 +184,37 @@ namespace DotX86.Core.Cpu.Tables
 						else
 						{
 							var Offset = Reader.ReadSByte();
+							return Instruction(Opcode.MOV, (Register)Left, Offset, (Register)Right);
+						}
+					}
+				// MOV Gw,Ew
+				case 0x8B:
+					{
+						var Param = Reader.ReadByte();
+						var Right = (Register)((Param >> 0) & 7);
+						var Left = (Register)((Param >> 3) & 7);
+
+						// MOV REG1, REG2
+						if (Param >= 0xC0)
+						{
+							throw(new NotImplementedException());
+						}
+						// MOV [REG1 + X], REG2
+						else
+						{
+							var Offset = Reader.ReadSByte();
 							return Instruction(Opcode.MOV, (Register)Left, (Register)Right, Offset);
 						}
+					}
+					break;
+				// LEA Gw
+				case 0x8D:
+					{
+						var Param = Reader.ReadByte();
+						var Right = ((Param >> 0) & 7);
+						var Left = ((Param >> 3) & 7);
+						var Offset = Reader.ReadSByte();
+						return Instruction(Opcode.LEA, (Register)Left, (Register)Right, Offset);
 					}
 				// XCHG AX, AX = NOP
 				// XCHG AX/CX/DX/BX/SP/BP/SI/DI, AX
@@ -181,14 +248,93 @@ namespace DotX86.Core.Cpu.Tables
 					{
 						return Instruction(Opcode.RETN);
 					}
+				// LEAVE
+				case 0xC9:
+					{
+						return Instruction(Opcode.LEAVE);
+					}
 					break;
+				// INT Ib
+				case 0xCD:
+					{
+						var Num = Reader.ReadByte();
+						return Instruction(Opcode.INT, (uint)Num);
+					}
 				// CALL Jw
 				case 0xE8:
 					{
 						var Value = Reader.ReadUInt32();
 						return Instruction(Opcode.CALL, Value);
 					}
-				default: throw(new NotImplementedException(String.Format("Unknown instruction with opcode 0x{0:X}", Byte)));
+				// JMP Jw
+				case 0xE9:
+				{
+					var Address = Reader.ReadInt32();
+					return new Instruction()
+					{
+						Type = InstructionType.Value,
+						Opcode = Opcode.JMP,
+						Value = (uint)Address,
+					};
+				}
+				// JMP Jb
+				case 0xEB:
+					{
+						var Address = Reader.ReadSByte();
+						return new Instruction()
+						{
+							Type = InstructionType.Value,
+							Opcode = Opcode.JMP,
+							Value = (uint)Address,
+						};
+					}
+					break;
+				// GRP5 Ew
+				case 0xFF:
+					{
+						var Param = Reader.ReadByte();
+						var Which = (Param >> 3) & 7;
+						switch (Which)
+						{
+							// INC Ew
+							//case 0:
+							//	break;
+							// DEC Ew
+							//case 1:
+							//	break;
+							// CALL Ev
+							//case 2:
+							//	break;
+							// CALL Ep
+							//case 3:
+							//	break;
+							// JMP Ev
+							case 4:
+								if (Param >= 0xC0)
+								{
+									throw (new NotImplementedException());
+								}
+								else
+								{
+									var Address = Reader.ReadInt32();
+									//throw(new NotImplementedException());
+									return new Instruction()
+									{
+										Type = InstructionType.Indirect,
+										Opcode = Opcode.JMP,
+										Value = (uint)Address,
+									};
+								}
+							// JMP Ep
+							//case 5:
+							//	break;
+							// PUSH Ev
+							//case 6:
+							//	break;
+							default: throw (new NotImplementedException("" + Which));
+						}
+					}
+				default: throw(new NotImplementedException(String.Format("Unknown instruction with opcode 0x{0:X} at 0x{1:X}", Byte, PC)));
 			}
 		}
 	}

@@ -10,11 +10,14 @@ namespace DotX86.Core.Cpu.Tables
 	public enum InstructionType
 	{
 		Empty,
-		Value1,
-		Register1,
-		Register2,
-		Register1Value1,
-		Register2Offset,
+		Value,
+		Register,
+		RegisterRegister,
+		RegisterValue,
+		RegisterRegisterOffset,
+		RegisterOffsetRegister,
+		Indirect,
+		//Relative,
 	}
 
 	public struct Instruction

@@ -26,11 +26,13 @@ namespace DotX86.Core.Cpu.Assembler
 			switch (Instruction.Type)
 			{
 				case InstructionType.Empty: return String.Format("{0}", Instruction.Opcode);
-				case InstructionType.Register1: return String.Format("{0} {1}", Instruction.Opcode, (ERegister)Instruction.Register1);
-				case InstructionType.Value1: return String.Format("{0} {1}", Instruction.Opcode, Instruction.Value);
-				case InstructionType.Register2: return String.Format("{0} {1}, {2}", Instruction.Opcode, (ERegister)Instruction.Register1, (ERegister)Instruction.Register2);
-				case InstructionType.Register1Value1: return String.Format("{0} {1}, {2}", Instruction.Opcode, (ERegister)Instruction.Register1, Instruction.Value);
-				case InstructionType.Register2Offset: return String.Format("{0} [{1}+{2}], {3}", Instruction.Opcode, (ERegister)Instruction.Register1, (int)Instruction.Value, (ERegister)Instruction.Register2);
+				case InstructionType.Register: return String.Format("{0} {1}", Instruction.Opcode, (ERegister)Instruction.Register1);
+				case InstructionType.Value: return String.Format("{0} {1}", Instruction.Opcode, (int)Instruction.Value);
+				case InstructionType.Indirect: return String.Format("{0} [0x{1:X}]", Instruction.Opcode, Instruction.Value);
+				case InstructionType.RegisterRegister: return String.Format("{0} {1}, {2}", Instruction.Opcode, (ERegister)Instruction.Register1, (ERegister)Instruction.Register2);
+				case InstructionType.RegisterValue: return String.Format("{0} {1}, {2}", Instruction.Opcode, (ERegister)Instruction.Register1, Instruction.Value);
+				case InstructionType.RegisterOffsetRegister: return String.Format("{0} [{1}+{2}], {3}", Instruction.Opcode, (ERegister)Instruction.Register1, (int)Instruction.Value, (ERegister)Instruction.Register2);
+				case InstructionType.RegisterRegisterOffset: return String.Format("{0} {1}, [{2}+{3}]", Instruction.Opcode, (ERegister)Instruction.Register1, (ERegister)Instruction.Register2, (int)Instruction.Value);
 				default: throw(new Exception("Not implemented " + Instruction.Type));
 			}
 		}

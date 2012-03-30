@@ -19,6 +19,12 @@ namespace DotX86.Core
 			return 0;
 		}
 
+		public uint AllocStack(int Size)
+		{
+			//return (uint)Marshal.AllocHGlobal(Size).ToInt32();
+			return 0x9000;
+		}
+
 		public void Free(uint Address)
 		{
 			//Marshal.FreeHGlobal(new IntPtr((int)Address));
@@ -30,17 +36,29 @@ namespace DotX86.Core
 			MemoryPointer[Address + 1] = (byte)((Value >> 8) & 0xFF);
 			MemoryPointer[Address + 2] = (byte)((Value >> 16) & 0xFF);
 			MemoryPointer[Address + 3] = (byte)((Value >> 24) & 0xFF);
-			//Console.WriteLine("{0:X} <- {1:X}", Address, Value);
+			//Console.WriteLine("WRITE4[0x{0:X}] = 0x{1:X}", Address, Value);
 		}
 
 		public uint Read4(uint Address)
 		{
-			return 
-				(uint)(MemoryPointer[Address + 0] << 0) |
-				(uint)(MemoryPointer[Address + 1] << 8) |
-				(uint)(MemoryPointer[Address + 2] << 16) |
-				(uint)(MemoryPointer[Address + 3] << 24)
-			;
+			try
+			{
+				var Value =
+					(uint)(MemoryPointer[Address + 0] << 0) |
+					(uint)(MemoryPointer[Address + 1] << 8) |
+					(uint)(MemoryPointer[Address + 2] << 16) |
+					(uint)(MemoryPointer[Address + 3] << 24)
+				;
+
+				//Console.WriteLine("READ4[0x{0:X}] -> 0x{1:X}", Address, Value);
+
+				return Value;
+			}
+			catch (KeyNotFoundException)
+			{
+				//throw (new InvalidDataException(String.Format("Invalid address 0x{0:X}", Address)));
+				return 0;
+			}
 		}
 
 		public void Write(uint Address, byte[] Data)
@@ -54,12 +72,14 @@ namespace DotX86.Core
 		public class MemorySliceStream : Stream
 		{
 			Memory Memory;
-			uint Address;
+			uint BaseAddress;
+			uint _Position;
 
-			public MemorySliceStream(Memory Memory, uint Address)
+			public MemorySliceStream(Memory Memory, uint BaseAddress)
 			{
 				this.Memory = Memory;
-				this.Address = Address;
+				this.BaseAddress = BaseAddress;
+				this._Position = 0;
 			}
 
 			public override bool CanRead
@@ -85,7 +105,7 @@ namespace DotX86.Core
 			{
 				get
 				{
-					return Memory.Length;
+					return Memory.Length - BaseAddress;
 				}
 			}
 
@@ -93,11 +113,11 @@ namespace DotX86.Core
 			{
 				get
 				{
-					return Address;
+					return _Position;
 				}
 				set
 				{
-					Address = (uint)value;
+					_Position = (uint)value;
 				}
 			}
 
@@ -105,9 +125,9 @@ namespace DotX86.Core
 			{
 				switch (origin)
 				{
-					case SeekOrigin.Begin: Address = (uint)offset; break;
-					case SeekOrigin.Current: Address = (uint)(Address + offset); break;
-					case SeekOrigin.End: Address = (uint)(Length - offset); break;
+					case SeekOrigin.Begin: _Position = (uint)offset; break;
+					case SeekOrigin.Current: _Position = (uint)(_Position + offset); break;
+					case SeekOrigin.End: _Position = (uint)(Length - offset); break;
 				}
 				return Position;
 			}
@@ -118,25 +138,34 @@ namespace DotX86.Core
 
 			public override int Read(byte[] buffer, int offset, int count)
 			{
-				for (int n = 0; n < count; n++)
+				try
 				{
-					buffer[offset + n] = Memory.MemoryPointer[Address++];
+					for (int n = 0; n < count; n++)
+					{
+						buffer[offset + n] = Memory.MemoryPointer[BaseAddress + _Position];
+						_Position++;
+					}
+					return count;
 				}
-				return count;
+				catch (KeyNotFoundException)
+				{
+					throw(new InvalidDataException(String.Format("Invalid address 0x{0:X}", BaseAddress + _Position)));
+				}
 			}
 
 			public override void Write(byte[] buffer, int offset, int count)
 			{
 				for (int n = 0; n < count; n++)
 				{
-					Memory.MemoryPointer[Address++] = buffer[offset + n];
+					Memory.MemoryPointer[BaseAddress + _Position] = buffer[offset + n];
+					_Position++;
 				}
 			}
 		}
 
-		public Stream GetStreamAt(uint Address)
+		public Stream GetStream()
 		{
-			return new MemorySliceStream(this, Address);
+			return new MemorySliceStream(this, 0);
 		}
 
 		public long Length { get {

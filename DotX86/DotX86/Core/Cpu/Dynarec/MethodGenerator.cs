@@ -1,4 +1,6 @@
-﻿using System;
+﻿//#define GENERATOR
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -45,13 +47,32 @@ namespace DotX86.Core.Cpu.Dynarec
 				while (Stream.Position < Stream.Length)
 				{
 					var PC = (uint)Stream.Position;
-					Console.Write("{0:X} ", PC);
+#if GENERATOR
+					Console.Write("# 0x{0:X}: ", PC);
+#endif
 					var Instruction = InstructionDecoder.DecodeInstruction(Reader);
+					var nPC = (uint)Stream.Position;
+#if GENERATOR
 					Console.WriteLine("{0}", Instruction);
-					if (!EmitInstruction(PC, Instruction, ILGenerator))
-					{
-						break;
-					}
+#endif
+
+#if GENERATOR
+					LoadThreadContext();
+					ILGenerator.Emit(OpCodes.Ldc_I4, PC);
+					ILGenerator.Emit(OpCodes.Ldstr, Instruction.ToString());
+					CallFunction((Action<ThreadContext, uint, string>)Operations.TRACE0);
+#endif
+
+					bool Result = EmitInstruction(PC, nPC, Instruction, ILGenerator);
+
+#if GENERATOR
+					LoadThreadContext();
+					ILGenerator.Emit(OpCodes.Ldc_I4, PC);
+					ILGenerator.Emit(OpCodes.Ldstr, Instruction.ToString());
+					CallFunction((Action<ThreadContext, uint, string>)Operations.TRACE1);
+#endif
+
+					if (!Result) break;
 				}
 				ILGenerator.Emit(OpCodes.Ret);
 			}
@@ -93,7 +114,7 @@ namespace DotX86.Core.Cpu.Dynarec
 				ILGenerator.Emit(OpCodes.Tailcall, Delegate.Method);
 			}
 
-			private bool EmitInstruction(uint PC, Instruction Instruction, ILGenerator ILGenerator)
+			private bool EmitInstruction(uint PC, uint nPC, Instruction Instruction, ILGenerator ILGenerator)
 			{
 				switch (Instruction.Opcode)
 				{
@@ -105,19 +126,20 @@ namespace DotX86.Core.Cpu.Dynarec
 						}
 						break;
 					case Opcode.MOV:
+						//Console.WriteLine("     {0}", Instruction.Type);
 						switch (Instruction.Type)
 						{
-							case InstructionType.Register2:
-								LoadRegisterAddress(Instruction.Register1);
-								LoadRegisterValue(Instruction.Register2);
-								CallFunction((REF_DWORD_DELEGATE)Operations.MOV_DWORD);
-								break;
-							case InstructionType.Register1Value1:
+							case InstructionType.RegisterValue:
 								LoadRegisterAddress(Instruction.Register1);
 								LoadValue(Instruction.Value);
 								CallFunction((REF_DWORD_DELEGATE)Operations.MOV_DWORD);
 								break;
-							case InstructionType.Register2Offset:
+							case InstructionType.RegisterRegister:
+								LoadRegisterAddress(Instruction.Register1);
+								LoadRegisterValue(Instruction.Register2);
+								CallFunction((REF_DWORD_DELEGATE)Operations.MOV_DWORD);
+								break;
+							case InstructionType.RegisterOffsetRegister:
 								LoadThreadContext();
 
 								LoadRegisterValue(Instruction.Register1);
@@ -128,23 +150,79 @@ namespace DotX86.Core.Cpu.Dynarec
 
 								CallFunction((Action<ThreadContext, uint, uint>)Operations.STORE_DWORD);
 								break;
+							case InstructionType.RegisterRegisterOffset:
+								LoadThreadContext();
+
+								LoadRegisterAddress(Instruction.Register1);
+
+								LoadRegisterValue(Instruction.Register2);
+								LoadValue(Instruction.Value);
+								ILGenerator.Emit(OpCodes.Add);
+
+								CallFunction((TCTX_REF_DWORD_DELEGATE)Operations.LOAD_DWORD);
+								break;
 							default:
-								throw(new InvalidDataException());
+								throw(new NotImplementedException());
 						}
 
 						break;
+					case Opcode.LEA:
+						switch (Instruction.Type)
+						{
+							// LEA REG, [REG + OFF]
+							case InstructionType.RegisterRegisterOffset:
+								LoadRegisterAddress(Instruction.Register1);
+								LoadRegisterValue(Instruction.Register2);
+								LoadValue(Instruction.Value);
+								ILGenerator.Emit(OpCodes.Add);
+
+								CallFunction((REF_DWORD_DELEGATE)Operations.MOV_DWORD);
+								break;
+							default:
+								throw (new NotImplementedException());
+						}
+						break;
 					case Opcode.SUB:
 						{
-							LoadRegisterAddress(Instruction.Register1);
-							LoadValue(Instruction.Value);
-							CallFunction((REF_DWORD_DELEGATE)Operations.SUB_DWORD);
+							switch (Instruction.Type)
+							{
+								case InstructionType.RegisterValue:
+									LoadRegisterAddress(Instruction.Register1);
+									LoadValue(Instruction.Value);
+									CallFunction((REF_DWORD_DELEGATE)Operations.SUB_DWORD);
+									break;
+								default:
+									throw (new NotImplementedException());
+							}
 						}
 						break;
 					case Opcode.ADD:
 						{
-							LoadRegisterAddress(Instruction.Register1);
-							LoadValue(Instruction.Value);
-							CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
+							switch (Instruction.Type)
+							{
+								case InstructionType.RegisterValue:
+									LoadRegisterAddress(Instruction.Register1);
+									LoadValue(Instruction.Value);
+									CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
+									break;
+								default:
+									throw (new NotImplementedException());
+							}
+						}
+						break;
+					case Opcode.CMP:
+						{
+							switch (Instruction.Type)
+							{
+								case InstructionType.RegisterValue:
+									LoadThreadContext();
+									LoadRegisterValue(Instruction.Register1);
+									LoadValue(Instruction.Value);
+									CallFunction((Action<ThreadContext, int, int>)Operations.CMP_DWORD);
+									break;
+								default:
+									throw (new NotImplementedException());
+							}
 						}
 						break;
 					case Opcode.XCHG:
@@ -162,16 +240,66 @@ namespace DotX86.Core.Cpu.Dynarec
 
 							return false;
 						}
+					case Opcode.JGE:
+						{
+							switch (Instruction.Type)
+							{
+								case InstructionType.Value:
+									LoadThreadContext();
+									LoadValue((uint)(nPC));
+									LoadValue((uint)(nPC + Instruction.Value));
+									CallFunction((Action<ThreadContext, uint, uint>)Operations.JUMP_GREATER_EQUAL);
+									break;
+								default:
+									throw (new NotImplementedException());
+							}
+							return false;
+						}
+						break;
+					case Opcode.JMP:
+						{
+							switch (Instruction.Type)
+							{
+								case InstructionType.Indirect:
+									LoadThreadContext();
+									LoadValue((uint)Instruction.Value);
+									CallFunction((Action<ThreadContext, uint>)Operations.JUMP_INDIRECT);
+									break;
+								case InstructionType.Value:
+									LoadThreadContext();
+									LoadValue((uint)(nPC + Instruction.Value));
+									CallFunction((Action<ThreadContext, uint>)Operations.JUMP);
+									break;
+								default:
+									throw(new NotImplementedException());
+							}
+							return false;
+						}
+					case Opcode.INT:
+						{
+							LoadThreadContext();
+							LoadValue(nPC);
+							LoadValue(Instruction.Value);
+							CallFunction((Action<ThreadContext, uint, uint>)Operations.INTERRUPT);
+							return false;
+						}
+					case Opcode.LEAVE:
+						{
+							LoadThreadContext();
+							CallFunction((Action<ThreadContext>)Operations.LEAVE);
+							//throw(new NotImplementedException());
+						}
 						break;
 					case Opcode.CALL:
 						{
-							uint ReturnPC = PC + 5;
+							uint ReturnPC = nPC;
 							uint CallPC = ReturnPC + Instruction.Value;
 
 							LoadThreadContext();
 							LoadValue((uint)ReturnPC);
 							LoadValue((uint)CallPC);
 							CallFunction((Action<ThreadContext, uint, uint>)Operations.CALL);
+							return false;
 
 							/*
 							int AllocatedIndex = 0;
@@ -205,9 +333,8 @@ namespace DotX86.Core.Cpu.Dynarec
 							CallFunction((Action<ThreadContext, Action<ThreadContext>>)Operations.CALLVIRT);
 							*/
 
-							return false;
+							
 						}
-						break;
 					default:
 						throw (new NotImplementedException("Unimplemented opcode " + Instruction.Opcode));
 				}
@@ -218,7 +345,7 @@ namespace DotX86.Core.Cpu.Dynarec
 		public Action<ThreadContext> GenerateMethod(CpuContext CpuContext, Stream Stream)
 		{
 			var Generator = new Generator(CpuContext, Stream);
-			Console.WriteLine("Generate");
+			//Console.WriteLine("Generate");
 			Generator.GenerateMethod();
 			return Generator.CreateDelegate();
 		}
