@@ -45,6 +45,7 @@
     <Compile Include="Core\Cpu\Assembler\Disassembler.cs" />
     <Compile Include="Core\Cpu\CpuContext.cs" />
     <Compile Include="Core\Cpu\Dynarec\MethodGenerator.cs" />
+    <Compile Include="Core\Cpu\Dynarec\Operations.Comparison.cs" />
     <Compile Include="Core\Cpu\Dynarec\Operations.Memory.cs" />
     <Compile Include="Core\Cpu\Tables\InstructionDecoder.cs" />
     <Compile Include="Core\Cpu\Tables\Instruction.cs" />

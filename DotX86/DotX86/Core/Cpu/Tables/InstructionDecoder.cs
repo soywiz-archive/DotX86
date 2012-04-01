@@ -90,6 +90,11 @@ namespace DotX86.Core.Cpu.Tables
 			var Byte = Reader.ReadByte();
 			switch (Byte)
 			{
+				// JZ
+				case 0x84: { var Value = Reader.ReadInt32(); return Instruction(Opcode.JZ, (uint)Value); }
+				// JNZ
+				case 0x85: { var Value = Reader.ReadInt32(); return Instruction(Opcode.JNZ, (uint)Value); }
+
 				// JNL / JGE
 				// http://en.wikibooks.org/wiki/X86_Assembly/Control_Flow
 				case 0x8D:
@@ -97,8 +102,6 @@ namespace DotX86.Core.Cpu.Tables
 						var Value = Reader.ReadInt32();
 						return Instruction(Opcode.JGE, (uint)Value);
 					}
-					throw (new NotImplementedException());
-					break;
 				default: throw (new NotImplementedException(String.Format("Unknown instruction with opcode 0x0F + 0x{0:X} at 0x{1:X}", Byte, PC)));
 			}
 		}
@@ -181,22 +184,45 @@ namespace DotX86.Core.Cpu.Tables
 							throw (new NotImplementedException());
 						}
 					}
+
+				// TEST Ew,Gw
+				case 0x85:
+					{
+						var Param = Reader.ReadByte();
+						var Left = ((Param >> 0) & 7);
+						var Right = ((Param >> 3) & 7);
+						return Instruction(Opcode.TEST, (Register)Left, (Register)Right);
+					}
+
+				// MOV Eb,Gb
+				case 0x88:
+					{
+						throw (new NotImplementedException());
+					}
+
 				// MOV Ew,Gw
 				case 0x89:
 					{
 						var Param = Reader.ReadByte();
 						var Left = ((Param >> 0) & 7);
 						var Right = ((Param >> 3) & 7);
+						var Info = (Param >> 6) & 3;
 
 						// MOV REG1, REG2
-						if (Param >= 0xC0)
+						if (Info == 3)
 						{
 							return Instruction(Opcode.MOV, (Register)Left, (Register)Right);
 						}
 						// MOV [REG1 + X], REG2
 						else
 						{
-							var Offset = Reader.ReadSByte();
+							int Offset = 0;
+							switch (Info)
+							{
+								case 0: break;
+								case 1: Offset = Reader.ReadSByte(); break;
+								default: throw (new NotImplementedException());
+							}
 							return Instruction(Opcode.MOV, (Register)Left, Offset, (Register)Right);
 						}
 					}
@@ -206,20 +232,26 @@ namespace DotX86.Core.Cpu.Tables
 						var Param = Reader.ReadByte();
 						var Right = (Register)((Param >> 0) & 7);
 						var Left = (Register)((Param >> 3) & 7);
+						var Info = (Param >> 6) & 3;
 
 						// MOV REG1, REG2
-						if (Param >= 0xC0)
+						if (Info == 3)
 						{
 							throw(new NotImplementedException());
 						}
 						// MOV [REG1 + X], REG2
 						else
 						{
-							var Offset = Reader.ReadSByte();
+							int Offset = 0;
+							switch (Info)
+							{
+								case 0: break;
+								case 1: Offset = Reader.ReadSByte(); break;
+								default: throw(new NotImplementedException());
+							}
 							return Instruction(Opcode.MOV, (Register)Left, (Register)Right, Offset);
 						}
 					}
-					break;
 				// LEA Gw
 				case 0x8D:
 					{
@@ -243,6 +275,12 @@ namespace DotX86.Core.Cpu.Tables
 						return Instruction(Opcode.XCHG, (Register)(Byte - 0x90), Register.AX);
 					}
 
+				// CDQ
+				case 0x99:
+					{
+						return Instruction(Opcode.CDQ);
+					}
+
 				//  MOV AX,Iw
 				case 0xB8:
 				case 0xB9:
@@ -256,6 +294,65 @@ namespace DotX86.Core.Cpu.Tables
 						var Value = Reader.ReadUInt32();
 						return Instruction(Opcode.MOV, (Register)(Byte - 0xB8), Value);
 					}
+
+				// GRP2 Ew,Ib
+				case 0xC1:
+					{
+						var Param = Reader.ReadByte();
+						var Which = (Param >> 3) & 7;
+						var Left = (Register)((Param >> 0) & 7);
+
+						if (Param >= 0xC0)
+						{
+							var Value = (uint)(int)Reader.ReadSByte();
+
+							switch (Which)
+							{
+								case 4:
+								case 5: return Instruction(Opcode.SHL, Left, Value);
+								default: throw (new NotImplementedException());
+							}
+						}
+						else
+						{
+							throw (new NotImplementedException());
+						}
+
+						/*
+						if (Param >= 0xc0)
+						{
+							GetEArw;										
+							Bit8u val=blah & 0x1f;							
+							switch (which)	{								
+							case 0x00:ROLW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x01:RORW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x02:RCLW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x03:RCRW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x04:// SHL and SAL are the same
+							case 0x06:SHLW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x05:SHRW(*earw,val,LoadRw,SaveRw);break;	
+							case 0x07:SARW(*earw,val,LoadRw,SaveRw);break;	
+							}												
+						}
+						else
+						{
+							GetEAa;											
+							Bit8u val=blah & 0x1f;							
+							switch (which) {								
+							case 0x00:ROLW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x01:RORW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x02:RCLW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x03:RCRW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x04:// SHL and SAL are the same 
+							case 0x06:SHLW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x05:SHRW(eaa,val,LoadMw,SaveMw);break;	
+							case 0x07:SARW(eaa,val,LoadMw,SaveMw);break;	
+							}												
+						}											
+						*/
+					}
+					break;
+
 				// RETN
 				case 0xC3:
 					{
@@ -302,6 +399,27 @@ namespace DotX86.Core.Cpu.Tables
 						};
 					}
 					break;
+				//
+				case 0xF7:
+					{
+						var Param = Reader.ReadByte();
+						var Which = (Param >> 3) & 7;
+						var Reg = (Register)((Param >> 0) & 7);
+						switch (Which)
+						{
+							/*
+							case 0: break; // TEST Ew,Iw
+							case 1: break; // TEST Ew,Iw Undocumented
+							case 2: break; // NOT Ew
+							case 3: break; // NEG Ew
+							case 4: break; // MUL AX,Ew
+							case 5: break; // IMUL AX,Ew
+							case 6: break; // DIV Ew
+							*/
+							case 7: return Instruction(Opcode.IDIV, Reg); // IDIV Ew
+							default: throw (new NotImplementedException());
+						}
+					}
 				// GRP5 Ew
 				case 0xFF:
 					{

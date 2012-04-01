@@ -57,28 +57,10 @@ namespace DotX86.Core.Cpu.Dynarec
 			Pointer += Value;
 		}
 
-		static public void CMP_DWORD(ThreadContext ThreadContext, int Left, int Right)
+		static public void SHL_DWORD(ref uint Pointer, uint Value)
 		{
-			int Result;
-
-			Result = Left - Right;
-
-			//Console.WriteLine("######## CMP: 0x{1:X} - 0x{2:X} = 0x{0:X}", Result, Left, Right);
-
-			ThreadContext.Flags.OF = false;
-			ThreadContext.Flags.ZF = (Result == 0);
-			ThreadContext.Flags.SF = (Result < 0);
-
-			//if (Right < Left) ThreadContext.Flags.OF = true;
-
-			try
-			{
-				Result = checked(Left - Right);
-			}
-			catch (OverflowException)
-			{
-				ThreadContext.Flags.OF = true;
-			}
+			//Console.WriteLine("({0})", Value);
+			Pointer <<= (int)Value;
 		}
 
 		static public void XCHG_DWORD(ref uint Left, ref uint Right)
@@ -105,19 +87,20 @@ namespace DotX86.Core.Cpu.Dynarec
 			ThreadContext.PC = JumpAddress;
 		}
 
-		internal static void JUMP_GREATER_EQUAL(ThreadContext ThreadContext, uint CurrentAddress, uint JumpAddress)
+		internal static void JUMP_ZERO(ThreadContext ThreadContext, uint CurrentAddress, uint JumpAddress)
 		{
-			// SignFlag == OverflowFlag
-			if (ThreadContext.Flags.SF == ThreadContext.Flags.OF)
-			{
-				ThreadContext.PC = JumpAddress;
-			}
-			else
-			{
-				ThreadContext.PC = CurrentAddress;
-			}
+			ThreadContext.PC = (ThreadContext.Flags.ZF) ? JumpAddress : CurrentAddress;
 		}
 
+		internal static void JUMP_NOT_ZERO(ThreadContext ThreadContext, uint CurrentAddress, uint JumpAddress)
+		{
+			ThreadContext.PC = (!ThreadContext.Flags.ZF) ? JumpAddress : CurrentAddress;
+		}
+
+		internal static void JUMP_GREATER_EQUAL(ThreadContext ThreadContext, uint CurrentAddress, uint JumpAddress)
+		{
+			ThreadContext.PC = (ThreadContext.Flags.SF == ThreadContext.Flags.OF) ? JumpAddress : CurrentAddress;
+		}
 
 		static public void RETURN(ThreadContext ThreadContext)
 		{
@@ -175,6 +158,19 @@ namespace DotX86.Core.Cpu.Dynarec
 		static public void TRACE1(ThreadContext ThreadContext, uint PC, string Instruction)
 		{
 			Console.WriteLine(" | $$ {0}", ThreadContext);
+		}
+
+		static public void CONVERT_DWORD_TO_QWORD(ThreadContext ThreadContext)
+		{
+			ThreadContext.EDX_EAX = (long)(int)ThreadContext.EAX;
+		}
+
+		static public void IDIV(ThreadContext ThreadContext)
+		{
+			var Numerator = ThreadContext.EDX_EAX;
+			var Denominator = ThreadContext.ECX;
+			ThreadContext.EAX = (uint)(Numerator / Denominator);
+			ThreadContext.EDX = (uint)(Numerator % Denominator);
 		}
 	}
 }

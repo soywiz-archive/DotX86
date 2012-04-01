@@ -26,5 +26,11 @@ namespace DotX86.Core.Cpu.Tables
 		LEA,
 		LEAVE,
 		JGE,
+		CDQ,
+		IDIV,
+		TEST,
+		JZ,
+		JNZ,
+		SHL,
 	}
 }

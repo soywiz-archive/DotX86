@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DotX86.Core;
 using DotX86.Core.Cpu;
 using DotX86.Core.Cpu.Dynarec;
+using DotX86.Hle.modules;
 using DotX86.Loader;
 
 namespace DotX86
@@ -15,7 +16,7 @@ namespace DotX86
 	{
 		//static Action<int> Test;
 
-		static void Main(string[] args)
+		static void Main2(string[] args)
 		{
 			/*
 			Test = (a) =>
@@ -45,6 +46,26 @@ namespace DotX86
 				var Method = CpuContext.GetMethod(ThreadContext.PC);
 				Method(ThreadContext);
 			}
+
+		}
+
+		static void Main(string[] args)
+		{
+			try
+			{
+				Main2(args);
+			}
+			catch (X86HaltException)
+			{
+			}
+			/*
+			catch (Exception Exception)
+			{
+				Console.WriteLine(Exception);
+			}
+			*/
+
+			Console.ReadKey();
 			//Console.WriteLine("Ended!");
 			//Console.ReadKey();
 		}

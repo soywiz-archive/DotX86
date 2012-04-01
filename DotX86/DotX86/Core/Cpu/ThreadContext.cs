@@ -105,6 +105,19 @@ namespace DotX86.Core.Cpu
 		public uint ESI;
 		public uint EDI;
 
+		public long EDX_EAX
+		{
+			get
+			{
+				return (long)((EDX << 32) | (EAX << 0));
+			}
+			set
+			{
+				EDX = (uint)(value >> 32);
+				EAX = (uint)(value >> 0);
+			}
+		}
+
 		public CpuContext CpuContext;
 		public Memory Memory { get { return CpuContext.Memory; } }
 		public Stream MemoryStream { get { return Memory.GetStream(); } }

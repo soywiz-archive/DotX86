@@ -205,11 +205,47 @@ namespace DotX86.Core.Cpu.Dynarec
 									LoadValue(Instruction.Value);
 									CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
 									break;
-								default:
+								case InstructionType.RegisterRegister:
 									LoadRegisterAddress(Instruction.Register1);
 									LoadRegisterValue(Instruction.Register2);
 									CallFunction((REF_DWORD_DELEGATE)Operations.ADD_DWORD);
 									break;
+								default:
+									throw (new NotImplementedException());
+							}
+						}
+						break;
+					case Opcode.SHL:
+						{
+							switch (Instruction.Type)
+							{
+								case InstructionType.RegisterValue:
+									LoadRegisterAddress(Instruction.Register1);
+									LoadValue(Instruction.Value);
+									CallFunction((REF_DWORD_DELEGATE)Operations.SHL_DWORD);
+									break;
+								case InstructionType.RegisterRegister:
+									LoadRegisterAddress(Instruction.Register1);
+									LoadRegisterValue(Instruction.Register2);
+									CallFunction((REF_DWORD_DELEGATE)Operations.SHL_DWORD);
+									break;
+								default:
+									throw(new NotImplementedException());
+							}
+						}
+						break;
+					case Opcode.TEST:
+						{
+							switch (Instruction.Type)
+							{
+								case InstructionType.RegisterRegister:
+									LoadThreadContext();
+									LoadRegisterValue(Instruction.Register1);
+									LoadRegisterValue(Instruction.Register2);
+									CallFunction((Action<ThreadContext, int, int>)Operations.TEST_DWORD);
+									break;
+								default:
+									throw (new NotImplementedException());
 							}
 						}
 						break;
@@ -243,6 +279,8 @@ namespace DotX86.Core.Cpu.Dynarec
 
 							return false;
 						}
+					case Opcode.JZ:
+					case Opcode.JNZ:
 					case Opcode.JGE:
 						{
 							switch (Instruction.Type)
@@ -251,12 +289,35 @@ namespace DotX86.Core.Cpu.Dynarec
 									LoadThreadContext();
 									LoadValue((uint)(nPC));
 									LoadValue((uint)(nPC + Instruction.Value));
-									CallFunction((Action<ThreadContext, uint, uint>)Operations.JUMP_GREATER_EQUAL);
+									switch (Instruction.Opcode)
+									{
+										case Opcode.JZ: CallFunction((Action<ThreadContext, uint, uint>)Operations.JUMP_ZERO); break;
+										case Opcode.JNZ: CallFunction((Action<ThreadContext, uint, uint>)Operations.JUMP_NOT_ZERO); break;
+										case Opcode.JGE: CallFunction((Action<ThreadContext, uint, uint>)Operations.JUMP_GREATER_EQUAL); break;
+										default: throw (new NotImplementedException());
+									}
+									
 									break;
 								default:
 									throw (new NotImplementedException());
 							}
 							return false;
+						}
+					// idiv — Integer Division
+					// The idiv instruction divides the contents of the 64 bit integer EDX:EAX
+					// (constructed by viewing EDX as the most significant four bytes and EAX as
+					// the least significant four bytes) by the specified operand value. The quotient
+					// result of the division is stored into EAX, while the remainder is placed in EDX.
+					case Opcode.IDIV:
+						{
+							LoadThreadContext();
+							CallFunction((Action<ThreadContext>)Operations.IDIV);
+						}
+						break;
+					case Opcode.CDQ:
+						{
+							LoadThreadContext();
+							CallFunction((Action<ThreadContext>)Operations.CONVERT_DWORD_TO_QWORD);
 						}
 						break;
 					case Opcode.JMP:

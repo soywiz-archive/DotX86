@@ -6,6 +6,20 @@ using System.Threading.Tasks;
 
 namespace DotX86.Core.Cpu.Tables
 {
+	/*
+	public enum SRegister
+	{
+		AX = 0,
+		CX = 1,
+		DX = 2,
+		BX = 3,
+		SP = 4,
+		BP = 5,
+		SI = 6,
+		DI = 7,
+	}
+	*/
+
 	public enum Register
 	{
 		AX = 0,

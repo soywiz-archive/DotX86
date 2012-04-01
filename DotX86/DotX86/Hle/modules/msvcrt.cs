@@ -8,6 +8,10 @@ using DotX86.Core.Cpu;
 
 namespace DotX86.Hle.modules
 {
+	class X86HaltException : Exception
+	{
+	}
+
 	public class msvcrt : module
 	{
 		public void printf(ThreadContext ThreadContext)
@@ -71,7 +75,8 @@ namespace DotX86.Hle.modules
 
 		public void exit(ThreadContext ThreadContext)
 		{
-			//Console.ReadKey();
+			//throw (new X86HaltException());
+			Console.ReadKey();
 			Environment.Exit(0);
 		}
 	}
